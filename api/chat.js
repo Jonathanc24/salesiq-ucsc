@@ -1,60 +1,64 @@
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const apiKey = process.env.GEMINI_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: "API key not configured" });
+    return res.status(500).json({ error: "GEMINI_KEY no configurada en Vercel" });
   }
 
   const { system, messages } = req.body;
 
-  // Convert messages to Gemini format
-  // Gemini uses "contents" with "parts", and system prompt goes as first user message
   const contents = [];
-
-  // Add system prompt as initial context
   if (system) {
-    contents.push({ role: "user", parts: [{ text: `INSTRUCCIONES DEL SISTEMA:\n${system}` }] });
-    contents.push({ role: "model", parts: [{ text: "Entendido. Actuaré exactamente según esas instrucciones." }] });
+    contents.push({ role: "user", parts: [{ text: "INSTRUCCIONES:\n" + system }] });
+    contents.push({ role: "model", parts: [{ text: "Entendido. Seguire esas instrucciones." }] });
   }
-
-  // Add conversation history
   for (const msg of messages) {
     contents.push({
       role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }]
+      parts: [{ text: msg.content }],
     });
   }
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    const geminiRes = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents,
-          generationConfig: {
-            temperature: 0.8,
-            maxOutputTokens: 1000,
-          },
+          generationConfig: { temperature: 0.85, maxOutputTokens: 1200 },
         }),
       }
     );
 
-    const data = await response.json();
+    const data = await geminiRes.json();
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || "Gemini error" });
+    if (!geminiRes.ok) {
+      const errMsg = (data && data.error && data.error.message) ? data.error.message : JSON.stringify(data);
+      return res.status(geminiRes.status).json({ error: "Gemini: " + errMsg });
     }
 
-    // Return in a format the frontend can use
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const text = (data.candidates &&
+                  data.candidates[0] &&
+                  data.candidates[0].content &&
+                  data.candidates[0].content.parts &&
+                  data.candidates[0].content.parts[0] &&
+                  data.candidates[0].content.parts[0].text) ? data.candidates[0].content.parts[0].text : "";
+
+    if (!text) {
+      return res.status(500).json({ error: "Gemini devolvio respuesta vacia" });
+    }
+
     return res.status(200).json({ text });
 
-  } catch (error) {
-    return res.status(500).json({ error: "Error connecting to Gemini" });
+  } catch (err) {
+    return res.status(500).json({ error: "Error interno: " + err.message });
   }
 }
