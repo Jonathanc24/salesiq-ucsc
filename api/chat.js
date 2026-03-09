@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   // *** PEGA TU KEY DE GEMINI AQUI ***
-  const apiKey = "PEGA_TU_KEY_AQUI";
+  const apiKey = AIzaSyCimv_wAw6g4cEnNZzef-iq_KvwZ093fNU;
   // **********************************
 
   const { system, messages } = req.body;
