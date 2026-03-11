@@ -6,9 +6,10 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  // *** PEGA TU KEY DE GEMINI AQUI ***
-  const apiKey = AIzaSyCimv_wAw6g4cEnNZzef-iq_KvwZ093fNU;
-  // **********************************
+  const apiKey = process.env.GEMINI_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: "GEMINI_KEY no configurada en Vercel" });
+  }
 
   const { system, messages } = req.body;
 
